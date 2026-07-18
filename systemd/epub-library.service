@@ -1,0 +1,18 @@
+[Unit]
+Description=EPUB Library web app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bryan
+Group=bryan
+WorkingDirectory=/home/bryan/git/jp-audiobooks/epub-library
+Environment=EPUB_LIBRARY_ENV=prod
+Environment=PATH=/home/bryan/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/bryan/.local/bin/uv run cli.py serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

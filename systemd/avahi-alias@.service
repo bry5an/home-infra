@@ -1,0 +1,13 @@
+[Unit]
+Description=Publish mDNS alias %i.local for this host
+After=avahi-daemon.service
+Requires=avahi-daemon.service
+
+[Service]
+Type=simple
+ExecStart=/home/bryan/bin/avahi-alias.sh %i
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

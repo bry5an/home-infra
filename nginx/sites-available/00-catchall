@@ -1,0 +1,8 @@
+# Catches requests by raw IP or any unrecognized Host header so nothing is
+# reachable except through an explicitly configured *.local vhost below.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 444;
+}
