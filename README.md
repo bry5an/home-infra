@@ -37,7 +37,7 @@ Jellyfin (`:8096`) predates this repo and still runs as its own `jellyfin.servic
 `epub-library` used to run as a bare `uv run cli.py serve` under `nohup`, bound to `0.0.0.0:8000` (directly LAN-exposed, no boot start). Migrating it to this setup required, once:
 
 ```bash
-pkill -u bryan -f 'cli.py serve'   # stop the ad-hoc process
+pkill -u bryan -f '[c]li.py serve'   # bracket trick avoids pkill matching its own invocation over ssh
 # edit epub-library/config.prod.toml: host = "0.0.0.0" -> host = "127.0.0.1"
 ```
 
