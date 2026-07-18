@@ -1,10 +1,10 @@
-# Shared snippet: restrict a server block to private LAN ranges.
+# Managed by ansible - roles/webhost/templates/lan-only.conf.j2
 # `include snippets/lan-only.conf;` inside any server{} block.
 allow 127.0.0.1;
 allow ::1;
-allow 10.0.0.0/8;
-allow 172.16.0.0/12;
-allow 192.168.0.0/16;
+{% for range in lan_ranges %}
+allow {{ range }};
+{% endfor %}
 allow fe80::/10;
 allow fc00::/7;
 deny all;

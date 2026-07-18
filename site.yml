@@ -1,0 +1,5 @@
+---
+- name: Configure home web server
+  hosts: home
+  roles:
+    - webhost

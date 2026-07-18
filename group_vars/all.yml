@@ -1,0 +1,17 @@
+---
+lan_ranges:
+  - 10.0.0.0/8
+  - 172.16.0.0/12
+  - 192.168.0.0/16
+
+# Each entry gets: a systemd unit, an mDNS alias "<name>.local", and an nginx
+# vhost proxying "<name>.local" -> 127.0.0.1:<port>. See README for how to
+# add one.
+sites:
+  - name: epub
+    description: EPUB Library web app
+    workdir: /home/bryan/git/jp-audiobooks/epub-library
+    exec_start: /home/bryan/.local/bin/uv run cli.py serve
+    port: 8000
+    environment:
+      EPUB_LIBRARY_ENV: prod

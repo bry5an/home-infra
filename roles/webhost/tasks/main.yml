@@ -1,0 +1,155 @@
+---
+- name: Install nginx and avahi-utils
+  become: true
+  ansible.builtin.apt:
+    name:
+      - nginx
+      - avahi-utils
+    state: present
+    update_cache: true
+
+- name: Allow SSH through ufw (safety net so we never lock ourselves out)
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+
+- name: Allow HTTP from LAN ranges only
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: '80'
+    proto: tcp
+    src: "{{ item }}"
+  loop: "{{ lan_ranges }}"
+
+- name: Remove stale direct-port site rules (traffic goes through nginx now)
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port | string }}"
+    proto: tcp
+    delete: true
+  loop: "{{ sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Ensure ufw is enabled
+  become: true
+  community.general.ufw:
+    state: enabled
+
+- name: Install avahi alias helper script
+  become: true
+  ansible.builtin.copy:
+    src: avahi-alias.sh
+    dest: /home/bryan/bin/avahi-alias.sh
+    owner: bryan
+    group: bryan
+    mode: '0755'
+
+- name: Install avahi-alias@ systemd template
+  become: true
+  ansible.builtin.copy:
+    src: "avahi-alias@.service"
+    dest: /etc/systemd/system/avahi-alias@.service
+    mode: '0644'
+  notify: daemon-reload
+
+- name: Install per-site systemd unit
+  become: true
+  ansible.builtin.template:
+    src: site.service.j2
+    dest: "/etc/systemd/system/{{ item.name }}.service"
+    mode: '0644'
+  loop: "{{ sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: daemon-reload
+
+- name: Flush handlers so units exist before we enable them
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start mDNS alias per site
+  become: true
+  ansible.builtin.systemd:
+    name: "avahi-alias@{{ item.name }}.service"
+    enabled: true
+    state: started
+  loop: "{{ sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Enable and start per-site service
+  become: true
+  ansible.builtin.systemd:
+    name: "{{ item.name }}.service"
+    enabled: true
+    state: started
+  loop: "{{ sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Install nginx lan-only snippet
+  become: true
+  ansible.builtin.template:
+    src: lan-only.conf.j2
+    dest: /etc/nginx/snippets/lan-only.conf
+    mode: '0644'
+  notify: reload nginx
+
+- name: Install nginx catchall site
+  become: true
+  ansible.builtin.copy:
+    src: 00-catchall
+    dest: /etc/nginx/sites-available/00-catchall
+    mode: '0644'
+  notify: reload nginx
+
+- name: Enable nginx catchall site
+  become: true
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/00-catchall
+    dest: /etc/nginx/sites-enabled/00-catchall
+    state: link
+  notify: reload nginx
+
+- name: Remove nginx stock default site
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx
+
+- name: Install per-site nginx vhost
+  become: true
+  ansible.builtin.template:
+    src: vhost.conf.j2
+    dest: "/etc/nginx/sites-available/{{ item.name }}.local.conf"
+    mode: '0644'
+  loop: "{{ sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: reload nginx
+
+- name: Enable per-site nginx vhost
+  become: true
+  ansible.builtin.file:
+    src: "/etc/nginx/sites-available/{{ item.name }}.local.conf"
+    dest: "/etc/nginx/sites-enabled/{{ item.name }}.local.conf"
+    state: link
+  loop: "{{ sites }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: reload nginx
+
+- name: Ensure nginx is enabled and running
+  become: true
+  ansible.builtin.systemd:
+    name: nginx
+    enabled: true
+    state: started
+
+- name: Flush handlers so config errors surface now, not silently at play end
+  ansible.builtin.meta: flush_handlers

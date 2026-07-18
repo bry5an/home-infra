@@ -1,44 +1,51 @@
 # home-infra
 
-systemd units + nginx config for home-grown web apps on `media` (LAN-only, no internet exposure). Each site gets:
+Ansible playbook for home-grown web apps on `media` (LAN-only, no internet exposure). One role, `webhost`, parameterized over the `sites` list in `group_vars/all.yml`. For each site it manages:
 
-1. A systemd unit in `systemd/` that runs it and restarts it on boot/crash.
-2. An mDNS alias (`<name>.local`) published via the `avahi-alias@.service` template, listed in `aliases.txt`.
-3. An nginx vhost in `nginx/sites-available/` that proxies `<name>.local` to the app's `127.0.0.1:<port>` and restricts access to private LAN ranges (`nginx/snippets/lan-only.conf`).
+1. A systemd unit that runs it and restarts it on boot/crash.
+2. An mDNS alias (`<name>.local`) published via the `avahi-alias@.service` template.
+3. An nginx vhost proxying `<name>.local` to the app's `127.0.0.1:<port>`, restricted to private LAN ranges.
+4. `ufw` rules: port 80 allowed from LAN ranges only; any leftover direct-port rule for the app removed.
 
 nginx is the only thing allowed to listen on a LAN-facing port (80); every backend app binds to `127.0.0.1` only.
 
-## Deploying
+## Setup (once per control machine)
 
 ```bash
-git -C ~/git/home-infra pull
-sudo bash ~/git/home-infra/deploy.sh
+brew install ansible          # or: uv tool install ansible
+ansible-galaxy collection install -r requirements.yml
 ```
 
-`deploy.sh` is idempotent — installs nginx/avahi-utils if missing, installs/enables every `*.service` in `systemd/` (skipping the `@.` template itself), enables an `avahi-alias@<name>.service` for every line in `aliases.txt`, and syncs `nginx/` into `/etc/nginx/`.
+Requires `~/.ssh/config` to have a `media` host entry (already the case on this Mac). Ansible shells out to system `ssh`, so no separate credentials setup is needed.
+
+## Running
+
+```bash
+cd ~/git/home-infra
+ansible home -m ping                        # sanity check connectivity
+ansible-playbook site.yml --check --diff -K  # dry run, shows what would change
+ansible-playbook site.yml -K                 # apply
+```
+
+`-K` prompts for the sudo password on `media` (no passwordless sudo is configured, intentionally). `--check --diff` is the drift-detection story: run it any time to see whether the server has drifted from what's declared here, without changing anything.
 
 ## Adding a new site
 
-1. Add `systemd/<name>.service` (backend app, bound to `127.0.0.1:<port>`).
-2. Append `<name>` to `aliases.txt`.
-3. Add `nginx/sites-available/<name>.local.conf`, proxying to that port, with `include snippets/lan-only.conf;`.
-4. Commit, push, then on the server: `git pull && sudo bash deploy.sh`.
+1. Append an entry to `sites` in `group_vars/all.yml` (name, description, workdir, exec_start, port, environment). New sites should bind their app to `127.0.0.1:<port>` from the start — never `0.0.0.0`.
+2. `ansible-playbook site.yml --check --diff -K` to preview, then `ansible-playbook site.yml -K` to apply.
+
+No new files needed for a typical site — the role templates the systemd unit and nginx vhost from the `sites` list.
 
 ## Sites
 
 | Alias | Backend | Port | Source |
 |---|---|---|---|
-| epub.local | `epub-library.service` | 8000 | `~/git/jp-audiobooks/epub-library` |
+| epub.local | `epub-library.service` (from `sites: name: epub`) | 8000 | `~/git/jp-audiobooks/epub-library` |
 
-Jellyfin (`:8096`) predates this repo and still runs as its own `jellyfin.service` installed by its apt package — not managed here.
+Jellyfin (`:8096`) predates this repo and still runs as its own `jellyfin.service` installed by its apt package, with its own pre-existing `ufw` rule — not managed here.
 
-## One-time migration notes
+## History
 
-`epub-library` used to run as a bare `uv run cli.py serve` under `nohup`, bound to `0.0.0.0:8000` (directly LAN-exposed, no boot start). Migrating it to this setup required, once:
+Originally a hand-rolled bash `deploy.sh` (see git history before the Ansible rewrite). Moved to Ansible for `--check` drift detection and because the bash version silently missed a `ufw` rule for port 80 on first deploy — the kind of gap idempotent, declarative modules catch instead of hide.
 
-```bash
-pkill -u bryan -f '[c]li.py serve'   # bracket trick avoids pkill matching its own invocation over ssh
-# edit epub-library/config.prod.toml: host = "0.0.0.0" -> host = "127.0.0.1"
-```
-
-`deploy.sh` then takes over starting it via systemd. Any *new* site should be written to bind `127.0.0.1` from the start.
+`epub-library` itself was migrated once, by hand, from a bare `nohup uv run cli.py serve` (bound to `0.0.0.0:8000`, no boot start) to this setup — that migration is done and isn't part of the normal playbook run.

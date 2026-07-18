@@ -1,0 +1,18 @@
+---
+- name: reload nginx
+  become: true
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  listen: reload nginx
+
+- name: apply nginx reload
+  become: true
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+  listen: reload nginx
+
+- name: daemon-reload
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
