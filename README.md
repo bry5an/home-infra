@@ -27,7 +27,17 @@ ansible-playbook site.yml --check --diff -K  # dry run, shows what would change
 ansible-playbook site.yml -K                 # apply
 ```
 
-`-K` prompts for the sudo password on `media` (no passwordless sudo is configured, intentionally). `--check --diff` is the drift-detection story: run it any time to see whether the server has drifted from what's declared here, without changing anything.
+`-K` prompts for the sudo password on `media` (general passwordless sudo is not configured, intentionally — only the narrow command list below). `--check --diff` is the drift-detection story: run it any time to see whether the server has drifted from what's declared here, without changing anything.
+
+## Passwordless sudo (narrow allowlist)
+
+The role installs `/etc/sudoers.d/webhost` (validated with `visudo -cf`) so deploys can restart a site over ssh without a password. It is generated from `sites`, so a renamed or new site is covered automatically on the next `ansible-playbook site.yml -K` — this is what to re-run after renaming a service. Allowed for `bryan`, nothing else:
+
+- `systemctl restart|start|stop <name>` and `<name>.service` for each site (both spellings, since sudo matches arguments literally)
+- `systemctl reload nginx`, `systemctl restart nginx`, `nginx -t`
+- `systemctl daemon-reload`
+
+Use the full path, e.g. `ssh media 'sudo -n /usr/bin/systemctl restart library'`. Not included on purpose: `enable`/`disable`, `ufw`, `apt`, and file edits under `/etc`. `journalctl` and `systemctl status` need no sudo.
 
 ## Adding a new site
 

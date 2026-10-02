@@ -153,3 +153,13 @@
 
 - name: Flush handlers so config errors surface now, not silently at play end
   ansible.builtin.meta: flush_handlers
+
+- name: Install passwordless sudo for managing the sites (deploys, restarts)
+  become: true
+  ansible.builtin.template:
+    src: sudoers-webhost.j2
+    dest: /etc/sudoers.d/webhost
+    owner: root
+    group: root
+    mode: '0440'
+    validate: /usr/sbin/visudo -cf %s

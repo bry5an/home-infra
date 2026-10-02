@@ -1,0 +1,17 @@
+# Managed by Ansible (roles/webhost). Passwordless sudo for exactly these
+# commands, so deploys from other machines can restart a site without a
+# password. sudo matches the argument string literally, so each form
+# ("library" and "library.service") is listed separately.
+{% set sub = ['restart', 'start', 'stop'] %}
+{% set cmds = [] %}
+{% for site in sites %}
+{% for verb in sub %}
+{% set _ = cmds.append('/usr/bin/systemctl ' ~ verb ~ ' ' ~ site.name) %}
+{% set _ = cmds.append('/usr/bin/systemctl ' ~ verb ~ ' ' ~ site.name ~ '.service') %}
+{% endfor %}
+{% endfor %}
+{% set _ = cmds.append('/usr/bin/systemctl reload nginx') %}
+{% set _ = cmds.append('/usr/bin/systemctl restart nginx') %}
+{% set _ = cmds.append('/usr/sbin/nginx -t') %}
+{% set _ = cmds.append('/usr/bin/systemctl daemon-reload') %}
+{{ sudo_user | default('bryan') }} ALL=(root) NOPASSWD: {{ cmds | join(', ') }}
