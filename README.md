@@ -29,6 +29,18 @@ ansible-playbook site.yml -K                 # apply
 
 `-K` prompts for the sudo password on `media` (general passwordless sudo is not configured, intentionally — only the narrow command list below). `--check --diff` is the drift-detection story: run it any time to see whether the server has drifted from what's declared here, without changing anything.
 
+## TLS (mkcert, LAN-only)
+
+Every site is served on both `http://<name>.local` (80) and `https://<name>.local` (443) - there is deliberately no 80→443 redirect, so devices that haven't trusted the CA still work over HTTP. One mkcert leaf cert covers all `sites`.
+
+```bash
+brew install mkcert && mkcert -install      # once on the control Mac (adds the CA to Keychain)
+scripts/issue-cert.sh                       # writes certs/webhost{,-key}.pem (gitignored); re-run after adding a site
+ansible-playbook site.yml -K                # copies them to /etc/ssl/webhost and reloads nginx
+```
+
+Other devices trust it only after installing `$(mkcert -CAROOT)/rootCA.pem` (iPhone: AirDrop the file, install the profile, then enable it under Settings → General → About → Certificate Trust Settings). Keep `rootCA-key.pem` private; it never goes on the server. Leaf certs last ~2y 3m - re-issue and re-apply before then.
+
 ## Passwordless sudo (narrow allowlist)
 
 The role installs `/etc/sudoers.d/webhost` (validated with `visudo -cf`) so deploys can restart a site over ssh without a password. It is generated from `sites`, so a renamed or new site is covered automatically on the next `ansible-playbook site.yml -K` — this is what to re-run after renaming a service. Allowed for `bryan`, nothing else:
@@ -51,6 +63,7 @@ No new files needed for a typical site — the role templates the systemd unit a
 | Alias | Backend | Port | Source |
 |---|---|---|---|
 | epub.local | `epub-library.service` (from `sites: name: epub`) | 8000 | `~/git/jp-audiobooks/epub-library` |
+| pathways.local | `pathways.service` | 8001 | `~/git/pathways` (`PATHWAYS_ENV=prod` disables Flask debug) |
 
 Jellyfin (`:8096`) predates this repo and still runs as its own `jellyfin.service` installed by its apt package, with its own pre-existing `ufw` rule — not managed here.
 

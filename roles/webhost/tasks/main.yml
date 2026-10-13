@@ -24,6 +24,15 @@
     src: "{{ item }}"
   loop: "{{ lan_ranges }}"
 
+- name: Allow HTTPS from LAN ranges only
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: '443'
+    proto: tcp
+    src: "{{ item }}"
+  loop: "{{ lan_ranges }}"
+
 - name: Remove stale direct-port site rules (traffic goes through nginx now)
   become: true
   community.general.ufw:
@@ -90,6 +99,43 @@
   loop: "{{ sites }}"
   loop_control:
     label: "{{ item.name }}"
+
+- name: Check the mkcert leaf cert exists on the control machine
+  delegate_to: localhost
+  become: false
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/certs/{{ item }}"
+  loop: [webhost.pem, webhost-key.pem]
+  register: cert_files
+
+- name: Fail with instructions if the cert has not been issued
+  ansible.builtin.assert:
+    that: cert_files.results | map(attribute='stat.exists') | min
+    fail_msg: "Run scripts/issue-cert.sh first (needs mkcert; see README, TLS section)."
+
+- name: Create TLS directory
+  become: true
+  ansible.builtin.file:
+    path: /etc/ssl/webhost
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install TLS cert and key
+  become: true
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/certs/{{ item.file }}"
+    dest: "/etc/ssl/webhost/{{ item.file }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { file: webhost.pem, mode: '0644' }
+    - { file: webhost-key.pem, mode: '0600' }
+  loop_control:
+    label: "{{ item.file }}"
+  notify: reload nginx
 
 - name: Install nginx lan-only snippet
   become: true

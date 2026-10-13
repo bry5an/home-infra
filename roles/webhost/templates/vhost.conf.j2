@@ -2,7 +2,14 @@
 server {
     listen 80;
     listen [::]:80;
+    listen 443 ssl;
+    listen [::]:443 ssl;
     server_name {{ item.name }}.local;
+
+    # mkcert leaf cert (scripts/issue-cert.sh). Plain HTTP stays available on
+    # purpose - no redirect - for devices that haven't trusted the CA yet.
+    ssl_certificate /etc/ssl/webhost/webhost.pem;
+    ssl_certificate_key /etc/ssl/webhost/webhost-key.pem;
 
     include snippets/lan-only.conf;
 

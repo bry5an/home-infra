@@ -1,6 +1,7 @@
 [Unit]
 Description=Publish mDNS alias %i.local for this host
-After=avahi-daemon.service
+Wants=network-online.target
+After=network-online.target avahi-daemon.service
 Requires=avahi-daemon.service
 
 [Service]
