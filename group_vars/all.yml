@@ -8,7 +8,7 @@ lan_ranges:
 sites:
   - name: library
     description: Library web app
-    workdir: /home/bryan/git/jp-audiobooks/epub-library
+    workdir: /home/bryan/git/jp-audiobooks
     exec_start: /home/bryan/.local/bin/uv run cli.py serve
     port: 8000
     environment:

@@ -62,7 +62,7 @@ No new files needed for a typical site — the role templates the systemd unit a
 
 | Alias | Backend | Port | Source |
 |---|---|---|---|
-| epub.local | `epub-library.service` (from `sites: name: epub`) | 8000 | `~/git/jp-audiobooks/epub-library` |
+| library.local | `library.service` (from `sites: name: library`) | 8000 | `~/git/jp-audiobooks` |
 | pathways.local | `pathways.service` | 8001 | `~/git/pathways` (`PATHWAYS_ENV=prod` disables Flask debug) |
 
 Jellyfin (`:8096`) predates this repo and still runs as its own `jellyfin.service` installed by its apt package, with its own pre-existing `ufw` rule — not managed here.
